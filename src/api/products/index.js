@@ -1,16 +1,36 @@
 import express from "express";
 import ProductsModel from "./module.js";
 import ReviewsModel from "../reviews/model.js";
+import q2m from "query-to-mongo";
 
 const productsRouter = express.Router();
 
 productsRouter.get("/", async (req, res, next) => {
+  console.log("query", req.query);
+  console.log("query", q2m(req.query));
+  const mongoQuery = q2m(req.query);
   try {
-    const products = await ProductsModel.find().populate({
-      path: "reviews",
-      select: "comment",
+    const products = await ProductsModel.find(
+      mongoQuery.criteria,
+      mongoQuery.options.fields
+    )
+      .limit(mongoQuery.options.limit)
+      .skip(mongoQuery.options.skip)
+      .sort(mongoQuery.options.sort)
+      .populate({
+        path: "reviews",
+        select: "comment",
+      });
+
+    const total = await ProductsModel.countDocuments(mongoQuery.criteria);
+
+    res.send({
+      links: mongoQuery.links("http://localhost:3001/products", total),
+      total,
+      numberOfPages: Math.ceil(total / mongoQuery.options.limit),
+      products,
     });
-    res.send(products);
+    // res.send(products);
   } catch (error) {
     next(error);
   }
